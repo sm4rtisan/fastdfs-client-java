@@ -10,6 +10,8 @@ package org.csource.fastdfs;
 
 import org.csource.common.MyException;
 import org.csource.fastdfs.pool.Connection;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -23,6 +25,7 @@ import java.util.Arrays;
  * @version Version 1.19
  */
 public class TrackerClient {
+    private static final Logger LOGGER = LoggerFactory.getLogger(TrackerClient.class);
     protected TrackerGroup tracker_group;
     protected byte errno;
 
@@ -196,6 +199,9 @@ public class TrackerClient {
                     + ProtoCommon.FDFS_IPADDR_SIZE - 1);
             store_path = pkgInfo.body[ProtoCommon.TRACKER_QUERY_STORAGE_STORE_BODY_LEN - 1];
 
+            String[] newStorage = storageConvert(ip_addr, port);
+            ip_addr = newStorage[0];
+            port = Integer.parseInt(newStorage[1]);
             return new StorageServer(ip_addr, port, store_path);
         } catch (IOException ex) {
             try {
@@ -441,9 +447,12 @@ public class TrackerClient {
             offset += ProtoCommon.FDFS_PROTO_PKG_LEN_SIZE;
 
             ServerInfo[] servers = new ServerInfo[server_count];
-            servers[0] = new ServerInfo(ip_addr, port);
+            String[] newStorage = storageConvert(ip_addr, port);
+            servers[0] = new ServerInfo(newStorage[0], Integer.parseInt(newStorage[1]));
             for (int i = 1; i < server_count; i++) {
-                servers[i] = new ServerInfo(new String(pkgInfo.body, offset, ProtoCommon.FDFS_IPADDR_SIZE - 1).trim(), port);
+                String ipAddr = new String(pkgInfo.body, offset, ProtoCommon.FDFS_IPADDR_SIZE - 1).trim();
+                String[] newStorageInFor = storageConvert(ipAddr, port);
+                servers[i] = new ServerInfo(newStorageInFor[0], Integer.parseInt(newStorageInFor[1]));
                 offset += ProtoCommon.FDFS_IPADDR_SIZE - 1;
             }
 
@@ -804,5 +813,23 @@ public class TrackerClient {
         }
 
         return this.errno == 0;
+    }
+
+    private String[] storageConvert(String ipAddr, Integer port) {
+        String [] ret = new String[2];
+        if (ClientGlobal.storageMapping != null) {
+            String address = ClientGlobal.storageMapping.get(ipAddr + ":" + port);
+            LOGGER.debug(ipAddr + ":" + port + "->" + address);
+            if (address != null && address.trim().length() != 0) {
+                String[] arr1 = address.trim().split(":");
+                ipAddr = arr1[0];
+                if (arr1.length > 1) {
+                    port = Integer.valueOf(arr1[1]);
+                }
+            }
+        }
+        ret[0] = ipAddr;
+        ret[1] = port + "";
+        return ret;
     }
 }

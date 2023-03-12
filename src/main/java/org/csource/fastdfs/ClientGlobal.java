@@ -15,9 +15,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.net.Socket;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Properties;
+import java.util.*;
 
 /**
  * Global variables
@@ -71,8 +69,11 @@ public class ClientGlobal {
   public static int g_connection_pool_max_count_per_entry = DEFAULT_CONNECTION_POOL_MAX_COUNT_PER_ENTRY;
   public static int g_connection_pool_max_idle_time = DEFAULT_CONNECTION_POOL_MAX_IDLE_TIME * 1000; //millisecond
   public static int g_connection_pool_max_wait_time_in_ms = DEFAULT_CONNECTION_POOL_MAX_WAIT_TIME_IN_MS; //millisecond
+  public static String PROP_KEY_STORAGE_SERVER_IP_MAPPING = "fastdfs.storage_server.ip_mapping";
 
   public static TrackerGroup g_tracker_group;
+
+  public static Map<String, String> storageMapping;
 
   private ClientGlobal() {
   }
@@ -138,6 +139,10 @@ public class ClientGlobal {
     if (g_connection_pool_max_wait_time_in_ms < 0) {
       g_connection_pool_max_wait_time_in_ms = DEFAULT_CONNECTION_POOL_MAX_WAIT_TIME_IN_MS;
     }
+    final String[] szStorageMappingArr = iniReader.getValues("storage_server.ip_mapping");
+    if (szStorageMappingArr != null) {
+        initByStorageMappings(szStorageMappingArr);
+    }
   }
 
   /**
@@ -179,6 +184,7 @@ public class ClientGlobal {
     String poolMaxCountPerEntry = props.getProperty(PROP_KEY_CONNECTION_POOL_MAX_COUNT_PER_ENTRY);
     String poolMaxIdleTime  = props.getProperty(PROP_KEY_CONNECTION_POOL_MAX_IDLE_TIME);
     String poolMaxWaitTimeInMS = props.getProperty(PROP_KEY_CONNECTION_POOL_MAX_WAIT_TIME_IN_MS);
+    String storageIpMapping = props.getProperty(PROP_KEY_STORAGE_SERVER_IP_MAPPING);
     if (connectTimeoutInSecondsConf != null && connectTimeoutInSecondsConf.trim().length() != 0) {
       g_connect_timeout = Integer.parseInt(connectTimeoutInSecondsConf.trim()) * 1000;
     }
@@ -209,6 +215,9 @@ public class ClientGlobal {
     if (poolMaxWaitTimeInMS != null && poolMaxWaitTimeInMS.trim().length() != 0) {
       g_connection_pool_max_wait_time_in_ms = Integer.parseInt(poolMaxWaitTimeInMS);
     }
+    if (storageIpMapping != null && storageIpMapping.trim().length() != 0) {
+      initByStorageMappings(storageIpMapping.split(","));
+    }
   }
 
   /**
@@ -235,6 +244,24 @@ public class ClientGlobal {
 
   public static void initByTrackers(InetSocketAddress[] trackerAddresses) throws IOException, MyException {
     g_tracker_group = new TrackerGroup(trackerAddresses);
+  }
+
+  public static void initByStorageMappings(final String[] storageMappigStringArr) {
+
+    if(storageMappigStringArr!=null){
+      for(final String  storageMappigStr : storageMappigStringArr){
+        initByStorageMapping(storageMappigStr);
+      }
+    }
+  }
+
+  public static void initByStorageMapping(final String storageMappigString) {
+    String spr1 = "->";
+    final String[] arr1 = storageMappigString.trim().split(spr1);
+    if (storageMapping == null) {
+      storageMapping = new HashMap<String,String>();
+    }
+    storageMapping.put(arr1[0].trim(), arr1[1].trim());
   }
 
   /**
@@ -339,6 +366,18 @@ public class ClientGlobal {
         trackerServers += address.startsWith("/") ? address.substring(1) : address;
       }
     }
+    String storageMappings = "";
+    if (storageMapping!=null) {
+      Set<String> keySet = storageMapping.keySet();
+      for (String key : keySet) {
+        String value = storageMapping.get(key);
+        String str = key + "->" + value;
+        if (storageMappings.length() > 0) {
+          storageMappings += ",";
+        }
+        storageMappings += str;
+      }
+    }
     return "{"
       + "\n  g_connect_timeout(ms) = " + g_connect_timeout
       + "\n  g_network_timeout(ms) = " + g_network_timeout
@@ -351,6 +390,7 @@ public class ClientGlobal {
       + "\n  g_connection_pool_max_idle_time(ms) = " + g_connection_pool_max_idle_time
       + "\n  g_connection_pool_max_wait_time_in_ms(ms) = " + g_connection_pool_max_wait_time_in_ms
       + "\n  trackerServers = " + trackerServers
+      + "\n  storageMapping = " + storageMappings
       + "\n}";
   }
 

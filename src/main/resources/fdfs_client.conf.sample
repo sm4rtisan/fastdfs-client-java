@@ -12,3 +12,6 @@ connection_pool.enabled = true
 connection_pool.max_count_per_entry = 500
 connection_pool.max_idle_time = 3600
 connection_pool.max_wait_time_in_ms = 1000
+
+storage_server.ip_mapping = 10.0.11.202:23000->10.0.12.202:23000
+storage_server.ip_mapping = 10.0.11.203:23000->10.0.12.203:23000
